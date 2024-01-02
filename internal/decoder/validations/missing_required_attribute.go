@@ -47,7 +47,7 @@ func (mra MissingRequiredAttribute) Visit(ctx context.Context, node hclsyntax.No
 					diags = append(diags, &hcl.Diagnostic{
 						Severity: hcl.DiagError,
 						Summary:  fmt.Sprintf("Required attribute %q not specified", name),
-						Detail:   fmt.Sprintf("An attribute named %q is required here", name),
+						Detail:   fmt.Sprintf("%s", attr.Description.Value),
 						Subject:  nodeType.SrcRange.Ptr(),
 					})
 				}
