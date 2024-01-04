@@ -13,10 +13,10 @@ require (
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/hc-install v0.6.2
-	github.com/hashicorp/hcl-lang v0.0.0-20231130100155-255545969c6e
+	github.com/hashicorp/hcl-lang v0.0.0-20231220152752-07605a991838
 	github.com/hashicorp/hcl/v2 v2.19.1
-	github.com/hashicorp/terraform-exec v0.19.0
-	github.com/hashicorp/terraform-json v0.18.0
+	github.com/hashicorp/terraform-exec v0.20.0
+	github.com/hashicorp/terraform-json v0.20.0
 	github.com/hashicorp/terraform-registry-address v0.2.3
 	github.com/hashicorp/terraform-schema v0.0.0-20231207195933-950222f8f237
 	github.com/mcuadros/go-defaults v1.2.0
@@ -27,7 +27,7 @@ require (
 	github.com/otiai10/copy v1.14.0
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/stretchr/testify v1.8.4
-	github.com/vektra/mockery/v2 v2.38.0
+	github.com/vektra/mockery/v2 v2.39.1
 	github.com/zclconf/go-cty v1.14.1
 	github.com/zclconf/go-cty-debug v0.0.0-20191215020915-b22d67c1ba0b
 	go.bobheadxi.dev/gobenchdata v1.3.1
