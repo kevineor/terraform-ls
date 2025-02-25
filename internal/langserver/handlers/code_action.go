@@ -28,10 +28,10 @@ func (svc *service) textDocumentCodeAction(ctx context.Context, params lsp.CodeA
 	// For action definitions, refer to https://code.visualstudio.com/api/references/vscode-api#CodeActionKind
 	// We only support format type code actions at the moment, and do not want to format without the client asking for
 	// them, so exit early here if nothing is requested.
-	if len(params.Context.Only) == 0 {
-		svc.logger.Printf("No code action requested, exiting")
-		return ca, nil
-	}
+	// if len(params.Context.Only) == 0 {
+	// 	svc.logger.Printf("No code action requested, exiting")
+	// 	return ca, nil
+	// }
 
 	for _, o := range params.Context.Only {
 		svc.logger.Printf("Code actions requested: %q", o)
@@ -74,60 +74,29 @@ func (svc *service) textDocumentCodeAction(ctx context.Context, params lsp.CodeA
 					},
 				},
 			})
-		case ilsp.Quickfix:
+		case ilsp.QuickfixAddMissingAttributes:
 
-			var extractedMissingAttrs []string
-
-			for _, diag := range params.Context.Diagnostics {
-				diagExtra, ok := diag.Data.(map[string]interface{})
-				if !ok {
-					svc.logger.Printf("Diagnostic Data does not have the expected type, skipping")
-					continue
-				}
-				missingAttributeRaw, found := diagExtra["MissingAttribute"]
-				if !found {
-					continue
-				}
-				missingAttribute, ok := missingAttributeRaw.(string)
-				if !ok {
-					svc.logger.Printf("MissingAttribute does not have the expected type, skipping")
-					continue
-				}
-				extractedMissingAttrs = append(extractedMissingAttrs, missingAttribute)
-			}
-
-			if len(extractedMissingAttrs) == 0 {
-				svc.logger.Printf("No missing attributes found")
-				return ca, err
-			}
-
-			var edits []lsp.TextEdit
-
-			rng := params.Range
-			rng.Start.Line = rng.End.Line
-			rng.Start.Character = 0
-			rng.End.Character = 0
-
-			newText := ""
-
-			for _, missingAttr := range extractedMissingAttrs {
-				newText = newText + fmt.Sprintf("  %s = null\n", missingAttr)
-			}
-
-			edits = append(edits, lsp.TextEdit{
-				Range:   rng,
-				NewText: newText,
-			})
-
-			ca = append(ca, lsp.CodeAction{
-				Title: "Add missing attributes",
-				Kind:  action,
+			aggregatedCodeAction := lsp.CodeAction{
+				Title: "Add missing attribute",
+				Kind:  ilsp.QuickfixAddMissingAttributes,
 				Edit: lsp.WorkspaceEdit{
-					Changes: map[lsp.DocumentURI][]lsp.TextEdit{
-						lsp.DocumentURI(dh.FullURI()): edits,
-					},
+					Changes: map[lsp.DocumentURI][]lsp.TextEdit{},
 				},
-			})
+			}
+			// var aggregatedCodeAction lsp.CodeAction
+			println("TESSST")
+			for _, diag := range params.Context.Diagnostics {
+				svc.logger.Printf("DIAGS, %v", diag)
+				for _, ca := range diag.Data {
+					println("CA")
+					for _, changes := range ca.Edit.Changes {
+						println("Change")
+						aggregatedCodeAction.Edit.Changes[lsp.DocumentURI(dh.FullURI())] = append(aggregatedCodeAction.Edit.Changes[lsp.DocumentURI(dh.FullURI())], changes...)
+					}
+				}
+			}
+
+			ca = append(ca, aggregatedCodeAction)
 		}
 	}
 

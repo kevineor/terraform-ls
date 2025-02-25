@@ -11,11 +11,12 @@ import (
 
 const (
 	// SourceFormatAllTerraform is a Terraform specific format code action.
-	SourceFormatAllTerraform = "source.formatAll.terraform"
-	Quickfix                 = "quickfix"
+	// Quickfix type : we prepend the codeAction source project to ensure we can find the CodeActionKind source
+	SourceFormatAllTerraform     lsp.CodeActionKind = "source.formatAll.terraform"
+	QuickfixAddMissingAttributes lsp.CodeActionKind = "quickfix"
 )
 
-type CodeActions map[lsp.CodeActionKind]bool
+type CodeActionKinds map[lsp.CodeActionKind]bool
 
 var (
 	// `source.*`: Source code actions apply to the entire file. They must be explicitly
@@ -34,13 +35,13 @@ var (
 	// We do not register this for terraform to allow fine grained selection of actions.
 	// A user should be able to set `source.formatAll` to true, and source.formatAll.terraform to false to allow all
 	// files to be formatted, but not terraform files (or vice versa).
-	SupportedCodeActions = CodeActions{
-		SourceFormatAllTerraform: true,
-		Quickfix:                 true,
+	SupportedCodeActions = CodeActionKinds{
+		SourceFormatAllTerraform:     true,
+		QuickfixAddMissingAttributes: true,
 	}
 )
 
-func (c CodeActions) AsSlice() []lsp.CodeActionKind {
+func (c CodeActionKinds) AsSlice() []lsp.CodeActionKind {
 	s := make([]lsp.CodeActionKind, 0)
 	for v := range c {
 		s = append(s, v)
@@ -52,8 +53,8 @@ func (c CodeActions) AsSlice() []lsp.CodeActionKind {
 	return s
 }
 
-func (ca CodeActions) Only(only []lsp.CodeActionKind) CodeActions {
-	wanted := make(CodeActions, 0)
+func (ca CodeActionKinds) Only(only []lsp.CodeActionKind) CodeActionKinds {
+	wanted := make(CodeActionKinds, 0)
 
 	for _, kind := range only {
 		if v, ok := ca[kind]; ok {

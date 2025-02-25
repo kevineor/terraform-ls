@@ -4,6 +4,8 @@
 package lsp
 
 import (
+	"log"
+
 	"github.com/hashicorp/hcl/v2"
 	lsp "github.com/hashicorp/terraform-ls/internal/protocol"
 )
@@ -33,14 +35,47 @@ func HCLDiagsToLSP(hclDiags hcl.Diagnostics, source string) []lsp.Diagnostic {
 		if hclDiag.Subject != nil {
 			rnge = HCLRangeToLSP(*hclDiag.Subject)
 		}
+		codeActions := HCLCodeActionsToLSP(hclDiag.CodeActions, source)
+
 		diags = append(diags, lsp.Diagnostic{
 			Range:    rnge,
 			Severity: HCLSeverityToLSP(hclDiag.Severity),
 			Source:   source,
 			Message:  msg,
-			Data:     hclDiag.Extra,
+			Data:     codeActions,
 		})
+
+		log.Printf("CONVERTED %v", diags)
 
 	}
 	return diags
+}
+
+func HCLCodeActionsToLSP(codeActions []hcl.CodeAction, source string) []lsp.CodeAction {
+	lspCodeActions := []lsp.CodeAction{}
+	for _, codeAction := range codeActions {
+		lspCodeActions = append(lspCodeActions, HCLCodeActionToLSP(codeAction, source))
+	}
+	return lspCodeActions
+}
+
+func HCLCodeActionToLSP(codeAction hcl.CodeAction, source string) lsp.CodeAction {
+	var edits map[lsp.DocumentURI][]lsp.TextEdit
+	for _, edit := range codeAction.Edits {
+		if edits == nil {
+			edits = map[lsp.DocumentURI][]lsp.TextEdit{}
+		}
+		edits[lsp.DocumentURI(source)] = append(edits[lsp.DocumentURI(edit.Range.Filename)], lsp.TextEdit{
+			Range:   HCLRangeToLSP(edit.Range),
+			NewText: edit.NewText,
+		})
+	}
+
+	return lsp.CodeAction{
+		Title: codeAction.Message,
+		Kind:  lsp.CodeActionKind(codeAction.Kind),
+		Edit: lsp.WorkspaceEdit{
+			Changes: edits,
+		},
+	}
 }

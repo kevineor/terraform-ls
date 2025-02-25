@@ -1083,7 +1083,7 @@ type Diagnostic struct { // line 8545
 	 *
 	 * @since 3.16.0
 	 */
-	Data interface{} `json:"data,omitempty"`
+	Data []CodeAction `json:"data,omitempty"`
 }
 
 /*

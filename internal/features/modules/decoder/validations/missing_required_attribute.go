@@ -6,11 +6,15 @@ package validations
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/hashicorp/hcl-lang/schema"
 	"github.com/hashicorp/hcl-lang/schemacontext"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/hashicorp/terraform-ls/internal/lsp"
+	"github.com/zclconf/go-cty/cty"
 )
 
 type MissingRequiredAttribute struct{}
@@ -44,15 +48,21 @@ func (mra MissingRequiredAttribute) Visit(ctx context.Context, node hclsyntax.No
 			if attr.IsRequired {
 				_, ok := nodeType.Attributes[name]
 				if !ok {
-					diags = append(diags, &hcl.Diagnostic{
+					diag := hcl.Diagnostic{
 						Severity: hcl.DiagError,
 						Summary:  fmt.Sprintf("Required attribute %q not specified", name),
 						Detail:   fmt.Sprintf("An attribute named %q is required here", name),
 						Subject:  nodeType.SrcRange.Ptr(),
-						Extra: map[string]interface{}{
-							"MissingAttribute": name,
+					}
+					nodeType.Attributes[name] = &hclsyntax.Attribute{
+						Name: name,
+						Expr: &hclsyntax.LiteralValueExpr{
+							Val: cty.NullVal(cty.Type{}),
 						},
-					})
+					}
+					diag.CodeActions = append(diag.CodeActions, mra.buildMissingRequiredAttributeCodeAction(diag, name))
+					log.Printf("PRODUCED_DIAAAG : %v", diag)
+					diags = append(diags, &diag)
 
 				}
 			}
@@ -60,6 +70,39 @@ func (mra MissingRequiredAttribute) Visit(ctx context.Context, node hclsyntax.No
 	}
 
 	return ctx, diags
+}
+
+func (mra MissingRequiredAttribute) buildMissingRequiredAttributeCodeAction(diag hcl.Diagnostic, missingAttribute string) hcl.CodeAction {
+	var edits []hcl.TextEdit
+	var edit hcl.TextEdit
+
+	edit.Range = *diag.Subject
+	edit.Range.Start = edit.Range.End // To Append after the diagnostic
+	edit.Range.Start.Column = 1
+	edit.Range.End.Column = 1
+	file := hclwrite.NewEmptyFile()
+	body := file.Body()
+	body.SetAttributeValue(missingAttribute, cty.NullVal(cty.String))
+	var tokens hclwrite.Tokens
+	tokens = body.BuildTokens(tokens)
+
+	edit.NewText = fmt.Sprintf("%s", tokens.Bytes())
+	edits = append(edits, edit)
+
+	return hcl.CodeAction{
+		Message: "Add missing attribute",
+		Kind:    hcl.CodeActionKind(lsp.QuickfixAddMissingAttributes),
+		Edits:   edits,
+	}
+}
+
+type CodeActionMissingRequiredAttribute struct {
+	wrapped          interface{}
+	MissingAttribute string
+}
+
+func (w CodeActionMissingRequiredAttribute) UnwrapDiagnosticExtra() interface{} {
+	return w.wrapped
 }
 
 type unknownRequiredAttrsCtxKey struct{}
