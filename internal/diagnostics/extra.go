@@ -4,39 +4,31 @@
 package diagnostics
 
 import (
-	"encoding/json"
-	"fmt"
-
-	"github.com/hashicorp/hcl-lang/lang"
+	"github.com/hashicorp/hcl/v2"
 )
 
-type extraFactory func(json.RawMessage) (interface{}, error)
+// Extra "kind" discriminants. The kind is stored alongside the diagnostic
+// payload (as lsp.Diagnostic.Data on the wire) so the code-action layer can
+// dispatch to the right handler without knowing the concrete Go type up front.
+const (
+	MissingRequiredAttributesKind = "missingRequiredAttributes"
+)
 
-// extraRegistry maps the "kind" discriminant (stored in
-// lsp.Diagnostic.Data) to a factory that deserializes the full struct.
-// Register new Extra types here as new code-action kinds are added.
-var extraRegistry = map[string]extraFactory{
-	"missingRequiredAttributes": func(raw json.RawMessage) (interface{}, error) {
-		var extra lang.MissingRequiredAttributesDiagnosticExtra
-		if err := json.Unmarshal(raw, &extra); err != nil {
-			return nil, err
-		}
-		return extra, nil
-	},
+// MissingRequiredAttributesData is the machine-readable payload attached to a
+// "required attribute(s) not specified" diagnostic. It is the terraform-ls
+// owned contract: validators populate it on hcl.Diagnostic.Extra, and the
+// code-action layer reads it back to build a quickfix.
+//
+// The JSON shape is the contract; producers in other modules (e.g. the
+// hcl-lang validator used for .tftest.hcl files) only need to emit a
+// JSON-compatible value carrying the same "kind".
+type MissingRequiredAttributesData struct {
+	Kind              string    `json:"kind"`
+	MissingAttributes []string  `json:"missingAttributes"`
+	InsertAfterRange  hcl.Range `json:"insertAfterRange"`
 }
 
-// DeserializeExtra reads the "kind" field from data and dispatches to the
-// registered factory, returning the typed Extra value or an error.
-func DeserializeExtra(data json.RawMessage) (interface{}, error) {
-	var probe struct {
-		Kind string `json:"kind"`
-	}
-	if err := json.Unmarshal(data, &probe); err != nil {
-		return nil, err
-	}
-	factory, ok := extraRegistry[probe.Kind]
-	if !ok {
-		return nil, fmt.Errorf("unknown diagnostic extra kind: %q", probe.Kind)
-	}
-	return factory(data)
+// DiagnosticExtraUnwrap makes the value a well-behaved hcl diagnostic Extra.
+func (e MissingRequiredAttributesData) DiagnosticExtraUnwrap() interface{} {
+	return nil
 }

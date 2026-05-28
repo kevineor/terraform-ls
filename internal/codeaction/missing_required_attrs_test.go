@@ -6,14 +6,14 @@ package codeaction
 import (
 	"testing"
 
-	"github.com/hashicorp/hcl-lang/lang"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/terraform-ls/internal/diagnostics"
 	lsp "github.com/hashicorp/terraform-ls/internal/protocol"
 )
 
 func TestBuildMissingAttrsAction(t *testing.T) {
-	extra := lang.MissingRequiredAttributesDiagnosticExtra{
-		Kind:              "missingRequiredAttributes",
+	extra := diagnostics.MissingRequiredAttributesData{
+		Kind:              diagnostics.MissingRequiredAttributesKind,
 		MissingAttributes: []string{"ami", "instance_type"},
 		InsertAfterRange: hcl.Range{
 			Filename: "main.tf",
@@ -23,11 +23,15 @@ func TestBuildMissingAttrsAction(t *testing.T) {
 	}
 
 	uri := lsp.DocumentURI("file:///main.tf")
+	in := Input{URI: uri}
 	origDiag := lsp.Diagnostic{
-		Message: "Missing required attributes: \"ami\", \"instance_type\"",
+		Message: `Required attributes not specified: "ami", "instance_type"`,
 	}
 
-	action := BuildMissingAttrsAction(extra, uri, origDiag)
+	action, ok := buildMissingAttrsAction(extra, in, origDiag)
+	if !ok {
+		t.Fatal("expected an action to be built")
+	}
 
 	if action.Kind != lsp.QuickFix {
 		t.Errorf("expected QuickFix kind, got %q", action.Kind)
@@ -74,13 +78,23 @@ func TestBuildMissingAttrsAction_title(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		extra := lang.MissingRequiredAttributesDiagnosticExtra{
-			Kind:             "missingRequiredAttributes",
+		extra := diagnostics.MissingRequiredAttributesData{
+			Kind:              diagnostics.MissingRequiredAttributesKind,
 			MissingAttributes: tc.attrs,
 		}
-		action := BuildMissingAttrsAction(extra, "file:///x.tf", lsp.Diagnostic{})
+		action, ok := buildMissingAttrsAction(extra, Input{URI: "file:///x.tf"}, lsp.Diagnostic{})
+		if !ok {
+			t.Fatalf("attrs %v: expected an action", tc.attrs)
+		}
 		if action.Title != tc.title {
 			t.Errorf("attrs %v: want title %q, got %q", tc.attrs, tc.title, action.Title)
 		}
+	}
+}
+
+func TestBuildMissingAttrsAction_noAttributes(t *testing.T) {
+	_, ok := buildMissingAttrsAction(diagnostics.MissingRequiredAttributesData{}, Input{}, lsp.Diagnostic{})
+	if ok {
+		t.Error("expected no action when there are no missing attributes")
 	}
 }

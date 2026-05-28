@@ -9,11 +9,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hashicorp/hcl-lang/lang"
 	"github.com/hashicorp/hcl-lang/schema"
 	"github.com/hashicorp/hcl-lang/schemacontext"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/hashicorp/terraform-ls/internal/diagnostics"
 )
 
 type MissingRequiredAttribute struct{}
@@ -53,8 +53,8 @@ func (mra MissingRequiredAttribute) Visit(ctx context.Context, node hclsyntax.No
 
 // missingRequiredAttributesDiagnostic returns a single diagnostic listing all
 // required attributes absent from body, or nil if none are missing. The
-// diagnostic carries a MissingRequiredAttributesDiagnosticExtra so a language
-// server can offer a quickfix code action that inserts them.
+// diagnostic carries diagnostics.MissingRequiredAttributesData so the
+// code-action layer can offer a quickfix that inserts them.
 func missingRequiredAttributesDiagnostic(body *hclsyntax.Body, bodySchema *schema.BodySchema) *hcl.Diagnostic {
 	var missing []string
 	for name, attr := range bodySchema.Attributes {
@@ -88,8 +88,8 @@ func missingRequiredAttributesDiagnostic(body *hclsyntax.Body, bodySchema *schem
 		Summary:  summary,
 		Detail:   detail,
 		Subject:  body.SrcRange.Ptr(),
-		Extra: lang.MissingRequiredAttributesDiagnosticExtra{
-			Kind:              "missingRequiredAttributes",
+		Extra: diagnostics.MissingRequiredAttributesData{
+			Kind:              diagnostics.MissingRequiredAttributesKind,
 			MissingAttributes: missing,
 			InsertAfterRange:  body.EndRange,
 		},

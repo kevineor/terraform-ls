@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/hcl-lang/lang"
 	"github.com/hashicorp/hcl-lang/schema"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/hashicorp/terraform-ls/internal/diagnostics"
 	"github.com/zclconf/go-cty/cty"
 )
 
@@ -50,8 +50,8 @@ func TestMissingRequiredAttribute(t *testing.T) {
 						Start:    hcl.Pos{Line: 1, Column: 1, Byte: 0},
 						End:      hcl.Pos{Line: 2, Column: 1, Byte: 27},
 					},
-					Extra: lang.MissingRequiredAttributesDiagnosticExtra{
-						Kind:              "missingRequiredAttributes",
+					Extra: diagnostics.MissingRequiredAttributesData{
+						Kind:              diagnostics.MissingRequiredAttributesKind,
 						MissingAttributes: []string{"ami"},
 						InsertAfterRange: hcl.Range{
 							Filename: "test.tf",
@@ -75,8 +75,8 @@ func TestMissingRequiredAttribute(t *testing.T) {
 						Start:    hcl.Pos{Line: 1, Column: 1, Byte: 0},
 						End:      hcl.Pos{Line: 2, Column: 1, Byte: 11},
 					},
-					Extra: lang.MissingRequiredAttributesDiagnosticExtra{
-						Kind:              "missingRequiredAttributes",
+					Extra: diagnostics.MissingRequiredAttributesData{
+						Kind:              diagnostics.MissingRequiredAttributesKind,
 						MissingAttributes: []string{"ami", "instance_type"},
 						InsertAfterRange: hcl.Range{
 							Filename: "test.tf",

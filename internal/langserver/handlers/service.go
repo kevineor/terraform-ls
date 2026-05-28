@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/creachadair/jrpc2"
 	rpch "github.com/creachadair/jrpc2/handler"
 	"github.com/hashicorp/hcl-lang/decoder"
 	"github.com/hashicorp/hcl-lang/lang"
+	"github.com/hashicorp/terraform-ls/internal/codeaction"
 	lsctx "github.com/hashicorp/terraform-ls/internal/context"
 	idecoder "github.com/hashicorp/terraform-ls/internal/decoder"
 	"github.com/hashicorp/terraform-ls/internal/document"
@@ -86,6 +88,9 @@ type service struct {
 
 	walkerCollector    *walker.WalkerCollector
 	additionalHandlers map[string]rpch.Func
+
+	codeActions     *codeaction.Registry
+	codeActionsOnce sync.Once
 
 	singleFileMode bool
 }

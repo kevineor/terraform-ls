@@ -6,18 +6,19 @@ package codeaction
 import (
 	"fmt"
 
-	"github.com/hashicorp/hcl-lang/lang"
+	"github.com/hashicorp/terraform-ls/internal/diagnostics"
 	ilsp "github.com/hashicorp/terraform-ls/internal/lsp"
 	lsp "github.com/hashicorp/terraform-ls/internal/protocol"
 )
 
-// BuildMissingAttrsAction constructs a QuickFix CodeAction that inserts all
-// missing required attributes just before the closing `}` of the block body.
-func BuildMissingAttrsAction(
-	extra lang.MissingRequiredAttributesDiagnosticExtra,
-	uri lsp.DocumentURI,
-	origDiag lsp.Diagnostic,
-) lsp.CodeAction {
+// buildMissingAttrsAction constructs a QuickFix that inserts all missing
+// required attributes (as `<attr> = null`) just before the closing `}` of the
+// block body the diagnostic points at.
+func buildMissingAttrsAction(extra diagnostics.MissingRequiredAttributesData, in Input, diag lsp.Diagnostic) (lsp.CodeAction, bool) {
+	if len(extra.MissingAttributes) == 0 {
+		return lsp.CodeAction{}, false
+	}
+
 	insertPos := ilsp.HCLPosToLSP(extra.InsertAfterRange.Start)
 	insertRange := lsp.Range{Start: insertPos, End: insertPos}
 
@@ -32,12 +33,12 @@ func BuildMissingAttrsAction(
 	return lsp.CodeAction{
 		Title:       fmt.Sprintf("Add missing required attributes (%d)", len(extra.MissingAttributes)),
 		Kind:        lsp.QuickFix,
-		Diagnostics: []lsp.Diagnostic{origDiag},
+		Diagnostics: []lsp.Diagnostic{diag},
 		IsPreferred: true,
 		Edit: lsp.WorkspaceEdit{
 			Changes: map[lsp.DocumentURI][]lsp.TextEdit{
-				uri: edits,
+				in.URI: edits,
 			},
 		},
-	}
+	}, true
 }

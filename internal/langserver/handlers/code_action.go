@@ -5,12 +5,8 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
-	"github.com/hashicorp/hcl-lang/lang"
 	"github.com/hashicorp/terraform-ls/internal/codeaction"
-	"github.com/hashicorp/terraform-ls/internal/diagnostics"
 	"github.com/hashicorp/terraform-ls/internal/langserver/errors"
 	ilsp "github.com/hashicorp/terraform-ls/internal/lsp"
 	lsp "github.com/hashicorp/terraform-ls/internal/protocol"
@@ -27,84 +23,43 @@ func (svc *service) TextDocumentCodeAction(ctx context.Context, params lsp.CodeA
 }
 
 func (svc *service) textDocumentCodeAction(ctx context.Context, params lsp.CodeActionParams) ([]lsp.CodeAction, error) {
-	var ca []lsp.CodeAction
-
-	// For action definitions, refer to https://code.visualstudio.com/api/references/vscode-api#CodeActionKind
-	// We only support format type code actions at the moment, and do not want to format without the client asking for
-	// them, so exit early here if nothing is requested.
+	// Code actions must be explicitly requested. Exit early when the client
+	// asks for nothing, so we never compute (or format) without being asked.
 	if len(params.Context.Only) == 0 {
 		svc.logger.Printf("No code action requested, exiting")
-		return ca, nil
+		return nil, nil
 	}
-
-	for _, o := range params.Context.Only {
-		svc.logger.Printf("Code actions requested: %q", o)
-	}
-
-	wantedCodeActions := ilsp.SupportedCodeActions.Only(params.Context.Only)
-	if len(wantedCodeActions) == 0 {
-		return nil, fmt.Errorf("could not find a supported code action to execute for %s, wanted %v",
-			params.TextDocument.URI, params.Context.Only)
-	}
-
-	svc.logger.Printf("Code actions supported: %v", wantedCodeActions)
 
 	dh := ilsp.HandleFromDocumentURI(params.TextDocument.URI)
-
 	doc, err := svc.stateStore.DocumentStore.GetDocument(dh)
 	if err != nil {
-		return ca, err
+		return nil, err
 	}
 
-	for action := range wantedCodeActions {
-		switch action {
-		case ilsp.SourceFormatAllTerraform:
-			tfExec, err := module.TerraformExecutorForModule(ctx, dh.Dir.Path())
-			if err != nil {
-				return ca, errors.EnrichTfExecError(err)
-			}
+	in := codeaction.Input{
+		Handle:      dh,
+		URI:         lsp.DocumentURI(dh.FullURI()),
+		Text:        doc.Text,
+		Range:       params.Range,
+		Diagnostics: params.Context.Diagnostics,
+	}
 
-			edits, err := svc.formatDocument(ctx, tfExec, doc.Text, dh)
-			if err != nil {
-				return ca, err
-			}
+	return svc.codeActionRegistry().CodeActions(ctx, in, params.Context.Only)
+}
 
-			ca = append(ca, lsp.CodeAction{
-				Title: "Format Document",
-				Kind:  action,
-				Edit: lsp.WorkspaceEdit{
-					Changes: map[lsp.DocumentURI][]lsp.TextEdit{
-						lsp.DocumentURI(dh.FullURI()): edits,
-					},
-				},
-			})
-
-		case lsp.QuickFix:
-			for _, lspDiag := range params.Context.Diagnostics {
-				if lspDiag.Data == nil {
-					continue
-				}
-				raw, ok := lspDiag.Data.(json.RawMessage)
-				if !ok {
-					// Data may have been deserialized as map[string]interface{}
-					// by the JSON layer; re-encode to RawMessage.
-					re, err := json.Marshal(lspDiag.Data)
-					if err != nil {
-						continue
-					}
-					raw = re
-				}
-				extra, err := diagnostics.DeserializeExtra(raw)
+// codeActionRegistry lazily builds the per-session code-action registry,
+// wiring the providers to the services they need.
+func (svc *service) codeActionRegistry() *codeaction.Registry {
+	svc.codeActionsOnce.Do(func() {
+		svc.codeActions = codeaction.NewRegistry(codeaction.Deps{
+			Format: func(ctx context.Context, in codeaction.Input) ([]lsp.TextEdit, error) {
+				tfExec, err := module.TerraformExecutorForModule(ctx, in.Handle.Dir.Path())
 				if err != nil {
-					continue
+					return nil, errors.EnrichTfExecError(err)
 				}
-				switch e := extra.(type) {
-				case lang.MissingRequiredAttributesDiagnosticExtra:
-					ca = append(ca, codeaction.BuildMissingAttrsAction(e, lsp.DocumentURI(dh.FullURI()), lspDiag))
-				}
-			}
-		}
-	}
-
-	return ca, nil
+				return svc.formatDocument(ctx, tfExec, in.Text, in.Handle)
+			},
+		})
+	})
+	return svc.codeActions
 }

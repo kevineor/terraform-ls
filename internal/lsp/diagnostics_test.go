@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/hashicorp/hcl-lang/lang"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/terraform-ls/internal/diagnostics"
 )
 
 func TestHCLDiagsToLSP_ExtraSerializedToData(t *testing.T) {
-	extra := lang.MissingRequiredAttributesDiagnosticExtra{
-		Kind:              "missingRequiredAttributes",
+	extra := diagnostics.MissingRequiredAttributesData{
+		Kind:              diagnostics.MissingRequiredAttributesKind,
 		MissingAttributes: []string{"ami"},
 		InsertAfterRange: hcl.Range{
 			Filename: "main.tf",
@@ -45,11 +45,11 @@ func TestHCLDiagsToLSP_ExtraSerializedToData(t *testing.T) {
 		t.Fatalf("expected json.RawMessage, got %T", lspDiags[0].Data)
 	}
 
-	var decoded lang.MissingRequiredAttributesDiagnosticExtra
+	var decoded diagnostics.MissingRequiredAttributesData
 	if err := json.Unmarshal(raw, &decoded); err != nil {
 		t.Fatalf("unmarshal: %s", err)
 	}
-	if decoded.Kind != "missingRequiredAttributes" {
+	if decoded.Kind != diagnostics.MissingRequiredAttributesKind {
 		t.Errorf("unexpected kind: %q", decoded.Kind)
 	}
 	if len(decoded.MissingAttributes) != 1 || decoded.MissingAttributes[0] != "ami" {

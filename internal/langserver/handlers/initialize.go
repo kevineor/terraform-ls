@@ -20,7 +20,7 @@ import (
 )
 
 func (svc *service) Initialize(ctx context.Context, params lsp.InitializeParams) (lsp.InitializeResult, error) {
-	serverCaps := initializeResult(ctx)
+	serverCaps := initializeResult(ctx, svc.codeActionRegistry().Kinds())
 
 	out, err := settings.DecodeOptions(params.InitializationOptions)
 	if err != nil {
@@ -225,7 +225,7 @@ func getTelemetryProperties(out *settings.DecodedOptions) map[string]interface{}
 	return properties
 }
 
-func initializeResult(ctx context.Context) lsp.InitializeResult {
+func initializeResult(ctx context.Context, codeActionKinds []lsp.CodeActionKind) lsp.InitializeResult {
 	serverCaps := lsp.InitializeResult{
 		Capabilities: lsp.ServerCapabilities{
 			TextDocumentSync: lsp.TextDocumentSyncOptions{
@@ -237,7 +237,7 @@ func initializeResult(ctx context.Context) lsp.InitializeResult {
 				TriggerCharacters: []string{".", "["},
 			},
 			CodeActionProvider: lsp.CodeActionOptions{
-				CodeActionKinds: ilsp.SupportedCodeActions.AsSlice(),
+				CodeActionKinds: codeActionKinds,
 				ResolveProvider: false,
 			},
 			DeclarationProvider:        true,
