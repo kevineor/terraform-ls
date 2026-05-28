@@ -5,8 +5,12 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/hcl-lang/lang"
+	"github.com/hashicorp/terraform-ls/internal/codeaction"
+	"github.com/hashicorp/terraform-ls/internal/diagnostics"
 	"github.com/hashicorp/terraform-ls/internal/langserver/errors"
 	ilsp "github.com/hashicorp/terraform-ls/internal/lsp"
 	lsp "github.com/hashicorp/terraform-ls/internal/protocol"
@@ -74,6 +78,31 @@ func (svc *service) textDocumentCodeAction(ctx context.Context, params lsp.CodeA
 					},
 				},
 			})
+
+		case lsp.QuickFix:
+			for _, lspDiag := range params.Context.Diagnostics {
+				if lspDiag.Data == nil {
+					continue
+				}
+				raw, ok := lspDiag.Data.(json.RawMessage)
+				if !ok {
+					// Data may have been deserialized as map[string]interface{}
+					// by the JSON layer; re-encode to RawMessage.
+					re, err := json.Marshal(lspDiag.Data)
+					if err != nil {
+						continue
+					}
+					raw = re
+				}
+				extra, err := diagnostics.DeserializeExtra(raw)
+				if err != nil {
+					continue
+				}
+				switch e := extra.(type) {
+				case lang.MissingRequiredAttributesDiagnosticExtra:
+					ca = append(ca, codeaction.BuildMissingAttrsAction(e, lsp.DocumentURI(dh.FullURI()), lspDiag))
+				}
+			}
 		}
 	}
 

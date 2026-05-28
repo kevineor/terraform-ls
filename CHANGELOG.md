@@ -1,3 +1,9 @@
+## Unreleased
+
+ENHANCEMENTS:
+
+* Offer a `quickfix` code action that inserts missing required attributes when a block reports a "Required attribute not specified" diagnostic
+
 ## 0.36.3 (19 December 2024)
 
 BUG FIXES:

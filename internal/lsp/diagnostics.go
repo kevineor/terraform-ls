@@ -4,6 +4,8 @@
 package lsp
 
 import (
+	"encoding/json"
+
 	"github.com/hashicorp/hcl/v2"
 	lsp "github.com/hashicorp/terraform-ls/internal/protocol"
 )
@@ -33,12 +35,18 @@ func HCLDiagsToLSP(hclDiags hcl.Diagnostics, source string) []lsp.Diagnostic {
 		if hclDiag.Subject != nil {
 			rnge = HCLRangeToLSP(*hclDiag.Subject)
 		}
-		diags = append(diags, lsp.Diagnostic{
+		lspDiag := lsp.Diagnostic{
 			Range:    rnge,
 			Severity: HCLSeverityToLSP(hclDiag.Severity),
 			Source:   source,
 			Message:  msg,
-		})
+		}
+		if hclDiag.Extra != nil {
+			if data, err := json.Marshal(hclDiag.Extra); err == nil {
+				lspDiag.Data = json.RawMessage(data)
+			}
+		}
+		diags = append(diags, lspDiag)
 
 	}
 	return diags
